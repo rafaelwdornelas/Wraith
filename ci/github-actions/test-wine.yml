@@ -1,0 +1,40 @@
+name: test-wine
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW + wine64 + CMake
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 \
+            cmake ninja-build wine64 wine
+
+      - name: Configure (default profile, tests on)
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-x86_64.cmake \
+            -DWRAITH_BUILD_TESTS=ON \
+            -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Run tests under wine64
+        env:
+          WINEDEBUG: -all
+        run: |
+          export WINEPREFIX=$HOME/.wine-wraith
+          mkdir -p "$WINEPREFIX"
+          wine64 wineboot --init || true
+          ctest --test-dir build --output-on-failure

@@ -1,0 +1,190 @@
+# =============================================================================
+#  Wraith - .gitignore
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Build outputs (CMake out-of-source)
+# -----------------------------------------------------------------------------
+build/
+build-*/
+out/
+out-*/
+cmake-build-*/
+.cache/
+
+# CMake droppings (in case anyone configures in-tree)
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+DartConfiguration.tcl
+_deps/
+
+# Ninja
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
+
+# Make
+Makefile
+
+# -----------------------------------------------------------------------------
+# Compiled artifacts
+# -----------------------------------------------------------------------------
+*.o
+*.obj
+*.lo
+*.slo
+*.ko
+
+# Static / shared libraries
+*.a
+*.la
+*.lai
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# Executables
+*.exe
+*.exp
+*.app
+*.out
+
+# Debug info / link maps
+*.pdb
+*.ilk
+*.idb
+*.map
+
+# Generated assembly / preprocessor dumps
+*.s
+*.i
+*.ii
+
+# -----------------------------------------------------------------------------
+# Code-generation outputs (created by tools/hashgen.py during build)
+# -----------------------------------------------------------------------------
+generated/
+wr_api_hashes.h
+
+# -----------------------------------------------------------------------------
+# Coverage / sanitizers / profiling
+# -----------------------------------------------------------------------------
+*.gcno
+*.gcda
+*.gcov
+coverage/
+*.profraw
+*.profdata
+callgrind.out.*
+massif.out.*
+perf.data
+perf.data.old
+core
+core.*
+vgcore.*
+
+# -----------------------------------------------------------------------------
+# Wine test artifacts
+# -----------------------------------------------------------------------------
+.wine/
+.wine-wraith/
+wine-prefix/
+*.reg
+
+# -----------------------------------------------------------------------------
+# Editors / IDEs
+# -----------------------------------------------------------------------------
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.sln.docstates
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains (CLion, IntelliJ, ...)
+.idea/
+*.iml
+cmake-build-debug/
+cmake-build-release/
+
+# Vim / Emacs / nano
+*.swp
+*.swo
+*.swn
+*~
+.\#*
+\#*\#
+.netrwhist
+
+# Sublime
+*.sublime-workspace
+*.sublime-project
+
+# Eclipse / KDevelop
+.cproject
+.project
+.settings/
+.kdev4/
+*.kdev4
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+
+# clangd / ccls / sourcegraph
+.clangd/
+.cache/
+.ccls-cache/
+compile_flags.txt
+
+# -----------------------------------------------------------------------------
+# OS junk
+# -----------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# -----------------------------------------------------------------------------
+# Python (used by tools/hashgen.py and tools/ioc_audit.py)
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# -----------------------------------------------------------------------------
+# Misc local config
+# -----------------------------------------------------------------------------
+.envrc
+.env
+.env.local
+.direnv/
+
+# Claude Code per-user settings (keep .claude/ shared config commitable)
+.claude/settings.local.json

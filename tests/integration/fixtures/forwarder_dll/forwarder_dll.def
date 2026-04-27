@@ -1,0 +1,17 @@
+; tests/integration/fixtures/forwarder_dll/forwarder_dll.def
+;
+; A tiny DLL whose exports are entirely forwarders to kernel32. Used by
+; tests/integration/test_load_forwarder.c to verify forwarder
+; resolution.
+;
+; The first export is a forwarder to kernel32!GetCurrentProcessId. We
+; pick that target because:
+;  - it has no side effects, returns a stable DWORD per process
+;  - it requires zero arguments, so calling it through a (DWORD(*)(void))
+;  pointer is straightforward to verify
+;  - kernel32 is loaded into every process, so the runtime vtable
+;  resolves it without fuss.
+
+LIBRARY forwarder_dll
+EXPORTS
+  GetForwardedProcessId = kernel32.GetCurrentProcessId

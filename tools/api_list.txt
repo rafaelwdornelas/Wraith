@@ -1,0 +1,43 @@
+# tools/api_list.txt -- input to tools/hashgen.py
+#
+# One entry per line. Comments (#) and blank lines ignored.
+# Lines ending in `.dll` are treated as module names; everything else
+# is treated as an exported function name. The generator emits one
+# `#define WRAITH_H_<sanitized> 0x........u` per entry.
+
+# === Modules ============================================================
+kernel32.dll
+ntdll.dll
+user32.dll
+advapi32.dll
+amsi.dll
+
+# === kernel32 (used by rt_api_ntapi to resolve dependencies) ============
+LoadLibraryA
+LoadLibraryW
+GetProcAddress
+FreeLibrary
+GetModuleHandleA
+GetModuleHandleW
+GetCurrentProcessId
+GetCurrentThreadId
+
+# === ntdll (will need these for indirect syscalls) ==============
+NtAllocateVirtualMemory
+NtProtectVirtualMemory
+NtFreeVirtualMemory
+NtCreateSection
+NtMapViewOfSection
+NtUnmapViewOfSection
+NtClose
+NtFlushInstructionCache
+NtQueryInformationProcess
+NtCreateFile
+NtReadFile
+NtWriteFile
+RtlAddFunctionTable
+RtlDeleteFunctionTable
+
+# === ETW / AMSI ============================================
+EtwEventWrite
+AmsiScanBuffer

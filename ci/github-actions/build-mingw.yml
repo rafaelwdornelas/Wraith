@@ -1,0 +1,44 @@
+name: build-mingw
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [default, teaching, paranoid-classic, paranoid-full, minimal]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW-w64 + CMake + Ninja
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 \
+            cmake ninja-build
+
+      - name: Configure (${{ matrix.profile }})
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-x86_64.cmake \
+            -DWRAITH_PROFILE=${{ matrix.profile }} \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wraith-mingw-${{ matrix.profile }}
+          path: |
+            build/libwraith.a
+            build/wraith.dll
+          if-no-files-found: ignore
