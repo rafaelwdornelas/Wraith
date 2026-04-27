@@ -64,6 +64,14 @@ extern const struct wr_map_ops wr_map_ops_mockingjay;
  * if the strategy was compiled out (e.g. PHANTOM with WRAITH_USE_PHANTOM_HOLLOWING=OFF). */
 const struct wr_map_ops *wr_map_resolve(wraith_map_strategy_t id);
 
+#if WRAITH_USE_PHANTOM_HOLLOWING
+/* Force phantom_is_blocked to report "blocked" for all subsequent
+ * wr_map_resolve calls in this process. Used by the pipeline when an
+ * actual ph_reserve attempt fails at runtime, so a later wraith_load_library
+ * call is silently downgraded without retrying the doomed phantom path. */
+void wr_phantom_mark_blocked(void);
+#endif
+
 /* Helpers shared across strategies. */
 
 /* Convert wraith_prot_t to a Win32 PAGE_* constant, returning 0 if the value

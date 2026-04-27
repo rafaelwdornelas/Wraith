@@ -188,3 +188,6 @@ env/
 
 # Claude Code per-user settings (keep .claude/ shared config commitable)
 .claude/settings.local.json
+
+# FUSE filesystem stale handles (created when files are deleted while open)
+.fuse_hidden*

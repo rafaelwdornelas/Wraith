@@ -79,10 +79,42 @@ extern NTSTATUS NTAPI wr_sc_stub_spoof_NtClose(HANDLE);
 #endif
 static WRAITH_TLS int g_thread_use_spoof = 0;
 
+/* Process-wide "is CET user-shadow-stack active?" flag.
+ *
+ * Stack spoofing pushes a synthetic return address onto the user stack
+ * only. On a CET-enabled process the CPU also maintains a shadow stack
+ * that the original CALL updated; the first `ret` after our `push`
+ * compares user-stack top (fake_ret) against shadow-stack top
+ * (real_ret), the mismatch raises #CP, and the kernel terminates the
+ * process via FailFast - no SEH handler can intercept it.
+ *
+ * Detection runs once at engine init via GetProcessMitigationPolicy
+ * (Win10 1607+). When the flag is set, every dispatch silently falls
+ * back to the non-spoofed asm stub regardless of what the load
+ * options requested. This is the auto-degradation path: callers ask
+ * for STACK_SPOOF, we deliver as much stealth as the host environment
+ * allows. */
+static atomic_int g_cet_user_shadow_stack = 0;
+
 void wr_sc_engine_set_thread_spoof(int enabled);
 void wr_sc_engine_set_thread_spoof(int enabled)
 {
+  /* Refuse to arm the per-thread spoof toggle when CET would crash
+   * the process on the first ret. The TLS write itself is harmless,
+   * but storing 0 here keeps wraith_stackspoof_probe and any
+   * downstream telemetry consistent ("spoof not active" rather than
+   * "spoof requested but engine refused"). */
+  if (enabled && atomic_load(&g_cet_user_shadow_stack)) {
+  g_thread_use_spoof = 0;
+  return;
+  }
   g_thread_use_spoof = enabled ? 1 : 0;
+}
+
+int wr_sc_engine_cet_active(void);
+int wr_sc_engine_cet_active(void)
+{
+  return atomic_load(&g_cet_user_shadow_stack) ? 1 : 0;
 }
 
 /* Direct fallback pointers (resolved via PEB walk + export resolver). */
@@ -256,6 +288,38 @@ static int detect_wine(void *ntdll)
   return wr_resolver_lookup_a(ntdll, "wine_get_version", &p) == WRAITH_OK;
 }
 
+/* CET user-shadow-stack probe.
+ *
+ * Calls GetProcessMitigationPolicy(ProcessUserShadowStackPolicy) on the
+ * current process. Returns 1 when EnableUserShadowStack is set,
+ * otherwise 0. The function is resolved dynamically so the wraith
+ * binary still loads on Win7/Win8/Win10-pre-1607 hosts where the API
+ * doesn't exist (probe degrades to "CET off, allow spoof").
+ *
+ * The MitigationPolicy enum and PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY
+ * struct are in winnt.h since the MinGW-w64 headers we build against. */
+static int probe_cet_user_shadow_stack(void)
+{
+  typedef BOOL (WINAPI *fn_GetProcMit)(HANDLE, PROCESS_MITIGATION_POLICY,
+                                       PVOID, SIZE_T);
+  HMODULE k32 = GetModuleHandleW(L"kernel32.dll");
+  if (!k32) {
+  return 0;
+  }
+  fn_GetProcMit get = (fn_GetProcMit)(void *)GetProcAddress(
+      k32, "GetProcessMitigationPolicy");
+  if (!get) {
+  return 0;
+  }
+  PROCESS_MITIGATION_USER_SHADOW_STACK_POLICY pol;
+  ZeroMemory(&pol, sizeof(pol));
+  if (!get(GetCurrentProcess(), ProcessUserShadowStackPolicy,
+           &pol, sizeof(pol))) {
+  return 0;
+  }
+  return pol.EnableUserShadowStack ? 1 : 0;
+}
+
 wraith_status_t wr_sc_engine_init(void)
 {
   if (atomic_load(&g_init_done)) {
@@ -385,6 +449,12 @@ wraith_status_t wr_sc_engine_init(void)
   g_mode = hells_hall_viable ? WRAITH_SC_MODE_HELLS_HALL
   : WRAITH_SC_MODE_FALLBACK;
 
+  /* Probe CET user-shadow-stack once. The dispatch macro reads this
+   * flag on every call to decide whether to route through the spoofed
+   * stub (incompatible with shadow stack) or the plain Hell's Hall
+   * stub (compatible). */
+  atomic_store(&g_cet_user_shadow_stack, probe_cet_user_shadow_stack());
+
   atomic_store(&g_init_done, 1);
   atomic_store(&g_init_lock, 0);
   return WRAITH_OK;
@@ -419,7 +489,9 @@ wraith_status_t wr_sc_engine_init(void)
   int _force_fb = atomic_load(&g_forced_fallback);  \
   if (!_force_fb && g_mode == WRAITH_SC_MODE_HELLS_HALL  \
       && wr_looks_like_valid_base(g_gadget)) {  \
-  if (g_thread_use_spoof && wr_looks_like_valid_base(g_ret_gadget)) {  \
+  if (g_thread_use_spoof  \
+      && !atomic_load(&g_cet_user_shadow_stack)  \
+      && wr_looks_like_valid_base(g_ret_gadget)) {  \
   r = (spoof_stub_call);  \
   } else {  \
   r = (stub_call);  \
@@ -523,6 +595,12 @@ wraith_status_t wraith_stackspoof_probe(void)
   return rc;
   }
   if (g_mode != WRAITH_SC_MODE_HELLS_HALL || g_ret_gadget == NULL) {
+  return WRAITH_E_STEALTH_INCOMPATIBLE;
+  }
+  /* CET user-shadow-stack incompatibility: the spoof would crash on
+   * the first ret. Surface it as STEALTH_INCOMPATIBLE so callers can
+   * treat the probe response as authoritative. */
+  if (atomic_load(&g_cet_user_shadow_stack)) {
   return WRAITH_E_STEALTH_INCOMPATIBLE;
   }
   return WRAITH_OK;

@@ -70,8 +70,30 @@ wraith_status_t wr_pipeline_run(const void *buffer, size_t size,
 
   /* [5] Reserve image ----------------------------------------------- */
   void *base = NULL;
-  WRAITH_PIPE_STEP(ctx, 5, "reserve",
-  ctx->map_ops->reserve(ctx, metrics.aligned_image_size, &base));
+  wraith_status_t reserve_rc =
+  ctx->map_ops->reserve(ctx, metrics.aligned_image_size, &base);
+
+#if WRAITH_USE_PHANTOM_HOLLOWING
+  /* Runtime auto-degradation: when the user asked for PHANTOM_HOLLOW
+   * but the actual reserve failed (kernel veto, EDR hook synthesizing
+   * an error, mitigation we didn't probe for), silently retry with
+   * private_rwx. The pre-flight probe in wr_map_resolve catches most
+   * Chrome / Edge cases up front; this is the safety net for the rest. */
+  if (reserve_rc != WRAITH_OK
+      && ctx->map_strategy == WRAITH_MAP_PHANTOM_HOLLOW
+      && ctx->map_ops != &wr_map_ops_private_rwx) {
+  wr_phantom_mark_blocked();
+  if (ctx->map_ops->destroy) {
+  ctx->map_ops->destroy(ctx);
+  }
+  ctx->map_ops = &wr_map_ops_private_rwx;
+  base = NULL;
+  reserve_rc = ctx->map_ops->reserve(ctx,
+  metrics.aligned_image_size, &base);
+  }
+#endif
+
+  WRAITH_PIPE_STEP(ctx, 5, "reserve", reserve_rc);
   ctx->image_base = (uint8_t *)base;
 
   /* [7] Copy headers + sections ------------------------------------- */
